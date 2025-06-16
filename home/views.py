@@ -59,7 +59,6 @@ class RegisterView(View):
             messages.error(request, "Email already registered.")
         else:
             user = User.objects.create_user(username=username, email=email, password=password)
-            user.is_active = False  # user needs approval
             user.save()
             messages.success(request, "Registration successful. Await admin approval.")
             return redirect('login')
