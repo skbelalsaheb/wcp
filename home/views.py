@@ -1,9 +1,9 @@
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.shortcuts import render, redirect
-# Create your views here.
 from django.views import View
 from django.contrib.auth.models import User
+from django.contrib import messages
 
 
 class HomeView(LoginRequiredMixin, View):
@@ -21,14 +21,21 @@ class Login(View):
         return render(request, 'login.html')
 
     def post(self, request):
-        username = request.POST.get('username')
-        password = request.POST.get('password')
-        user = authenticate(request, username=username, password=password)
-        if user is not None:
-            login(request, user)
-            return redirect("/")
-        return render(request, 'login.html', {'error': 'Invalid username or password'})
+            username = request.POST.get('username')
+            password = request.POST.get('password')
 
+            user = authenticate(request, username=username, password=password)
+
+            if user is not None:
+                if user.is_staff:
+                    login(request, user)
+                    return redirect('home')
+                else:
+                    messages.error(request, "Your account is pending admin approval.")
+            else:
+                messages.error(request, "Invalid credentials.")
+
+            return render(request, "login.html")
 
 class Logout(View):
     def get(self, request):
@@ -42,25 +49,18 @@ class RegisterView(View):
         return render(request, 'register.html')
 
     def post(self, request):
-        first_name = request.POST.get('first_name')
-        last_name = request.POST.get('last_name')
-        email = request.POST.get('email')
         username = request.POST.get('username')
+        email = request.POST.get('email')
         password = request.POST.get('password')
 
         if User.objects.filter(username=username).exists():
-            return render(request, 'register.html', {'error': 'Username already taken'})
-
-        if User.objects.filter(email=email).exists():
-            return render(request, 'register.html', {'error': 'Email already registered'})
-
-        user = User.objects.create_user(
-            username=username,
-            password=password,
-            first_name=first_name,
-            last_name=last_name,
-            email=email
-        )
-
-        login(request, user)
-        return redirect('/')
+            messages.error(request, "Username already exists.")
+        elif User.objects.filter(email=email).exists():
+            messages.error(request, "Email already registered.")
+        else:
+            user = User.objects.create_user(username=username, email=email, password=password)
+            user.is_active = False  # user needs approval
+            user.save()
+            messages.success(request, "Registration successful. Await admin approval.")
+            return redirect('login')
+        return render(request, 'register.html')
